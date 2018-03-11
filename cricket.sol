@@ -3,6 +3,7 @@ pragma solidity ^0.4.17;
 contract cricket{
     address owner;
 
+    //struct which holds all the game details
     struct game{
         uint gameId;
         uint externalGameId;
@@ -20,8 +21,10 @@ contract cricket{
         uint[] drawBetValues;
     }
 
+    //mapping to store all the ongoing games
     mapping(uint => game) public games;
 
+    //admin restrictions
     modifier restriction(){
         require(msg.sender == owner);
         _;
@@ -31,6 +34,9 @@ contract cricket{
         owner = msg.sender;
     }
 
+    /*
+    *createGame function can only be invoked by the admin to create new game
+    */
     function createGame(uint _gameId,uint _externalGameId, string _teamA, string _teamB) restriction public{
         game memory newGame = game({
             gameId:_gameId,
@@ -51,6 +57,9 @@ contract cricket{
         games[_gameId] = newGame;
     }
 
+    /*
+    *placeBet is payable function called by users to place a bet on a particular game
+    */
     function placeBet(uint _gameId, string _team) payable public{
         require(msg.value >= 0.01 ether);
         game storage fetchedGame = games[_gameId];
@@ -72,6 +81,9 @@ contract cricket{
     }
 
 
+    /*
+    *Helper function to calculate the percent of the winnig amount user should get
+    */
     function percent(uint numerator, uint denominator, uint precision) public pure  returns(uint quotient) {
          // caution, check safe-to-multiply here
         uint _numerator  = numerator * 10 ** (precision+1);
@@ -80,6 +92,9 @@ contract cricket{
         return ( _quotient);
     }
 
+    /*
+    *finalizeMatch can only be invoked by the admin to settle the match and payout all the winners
+    */
     function finalizeMatch(uint _gameId, string winner) restriction public{
         game fetchedGame = games[_gameId];
         uint i;
@@ -106,6 +121,27 @@ contract cricket{
                     fetchedGame.drawTotalBet,3) * (fetchedGame.teamATotalBet + fetchedGame.teamBTotalBet))/1000));
             }
         }
+        delete(games[_gameId]);
+    }
+
+    /*
+    *cancelGame can only be invoked by the admin to cancel the game and reimburse the ethereum to the users
+    */
+    function cancelGame(uint _gameId) restriction public{
+        game fetchedGame = games[_gameId];
+        uint i;
+        for (i=0;i<fetchedGame.teamABets.length;i++){
+            fetchedGame.teamABets[i].transfer(fetchedGame.teamABetValues[i]);
+        }
+
+        for (i=0;i<fetchedGame.teamBBets.length;i++){
+            fetchedGame.teamBBets[i].transfer(fetchedGame.teamBBetValues[i]);
+        }
+
+        for (i=0;i<fetchedGame.drawBets.length;i++){
+            fetchedGame.drawBets[i].transfer(fetchedGame.drawBetValues[i]);
+        }
+
         delete(games[_gameId]);
     }
 
